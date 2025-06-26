@@ -30,9 +30,7 @@ interface Queue {
   ActualPosition: number;
 }
 
-// --- DADOS MOCKADOS ---
-let restaurants: Restaurant[] = [
-  // Seus dados de restaurante aqui...
+let restaurants: Restaurant[] = [ 
   { 
     Id: 1, 
     Name: "Botequim Seu Jorge", 
@@ -54,7 +52,7 @@ let restaurants: Restaurant[] = [
 ];
 
 let queue: Queue[] = [
-  { Id: 1, IdRestaurant: 2, ActualOccupation: 3, ActualPosition: 1 }
+  { Id: 1, IdRestaurant: 2, ActualOccupation: 3, ActualPosition: 0 }
 ];
 
 let userQueue: UserQueue[] = [
@@ -64,6 +62,18 @@ let userQueue: UserQueue[] = [
 ];
 
 let nextQueueId = 2;
+
+const getInitialState = () => ({
+  initialQueue: [
+    { Id: 1, IdRestaurant: 2, ActualOccupation: 3, ActualPosition: 0 }
+  ],
+  initialUserQueue: [
+    { QueueId: 1, UserId: 101, Position: 1 },
+    { QueueId: 1, UserId: 102, Position: 2 },
+    { QueueId: 1, UserId: 103, Position: 3 },
+  ],
+  initialNextQueueId: 2,
+});
 
 // --- CONTROLLERS ---
 
@@ -96,7 +106,7 @@ export const joinQueue = (req: Request, res: Response): void => {
       Id: nextQueueId,
       IdRestaurant: restaurantIdnumber,
       ActualOccupation: 0,
-      ActualPosition: 1,
+      ActualPosition: 0,
     };
     queue.push(newQueue);
     targetQueue = newQueue;
@@ -125,7 +135,7 @@ export const nextInQueue = (req: Request, res: Response): void => {
   const queueToAdvance = queue.find(q => q.IdRestaurant === Number(restaurantId));
 
   if (queueToAdvance && queueToAdvance.ActualPosition < queueToAdvance.ActualOccupation) {
-    queueToAdvance.ActualPosition += 1;
+    queueToAdvance.ActualPosition += 1;    
     getIO().emit('queue:update', { queues: queue, userQueues: userQueue });
     res.json({ message: `Restaurante ${restaurantId} chamou a posição ${queueToAdvance.ActualPosition}`, queue });
   } else {
@@ -133,11 +143,6 @@ export const nextInQueue = (req: Request, res: Response): void => {
   }
 };
 
-
-/**
- * NOVA FUNÇÃO: Remove um usuário da fila.
- * Esta ação pode ser iniciada pelo próprio usuário (desistiu) ou por um admin.
- */
 export const leaveQueue = (req: Request, res: Response): void => {
   const { UserId } = req.body;
   const userIdnumber = Number(UserId);
@@ -154,24 +159,34 @@ export const leaveQueue = (req: Request, res: Response): void => {
   const queueId = userWhoLeft.QueueId;
   const positionOfUserWhoLeft = userWhoLeft.Position;
 
-  // 1. Remove o usuário da lista de usuários na fila
+  
   userQueue.splice(userIndex, 1);
 
-  // 2. Encontra a fila principal para decrementar a ocupação
+  
   const targetQueue = queue.find(q => q.Id === queueId);
   if (targetQueue) {
     targetQueue.ActualOccupation -= 1;
-
-    // 3. CRÍTICO: Ajusta a posição de todos que estavam atrás do usuário que saiu
+    
     userQueue.forEach(user => {
       if (user.QueueId === queueId && user.Position > positionOfUserWhoLeft) {
         user.Position -= 1;
       }
     });
   }
-
-  // Emite a atualização para todos os clientes
+  
   getIO().emit('queue:update', { queues: queue, userQueues: userQueue });
 
   res.json({ message: `Usuário ${userIdnumber} removido da fila.`, queue });
 };
+
+/**
+ * @internal Apenas para uso em testes.
+ * Reseta o estado do módulo para o estado inicial.
+ */
+export function __TEST_ONLY_resetState() {
+  const { initialQueue, initialUserQueue, initialNextQueueId } = getInitialState();
+  queue = [...initialQueue];
+  userQueue = [...initialUserQueue];
+  nextQueueId = initialNextQueueId;
+}
+__TEST_ONLY_resetState();
