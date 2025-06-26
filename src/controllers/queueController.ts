@@ -12,7 +12,7 @@ export interface Restaurant {
   Id: number;
   Name: string;
   logoUrl: string;
-  imageUrl: string; 
+  imageUrl: string;
   description: string;
   address: string;
   estimatedWaitTimePerPerson: number;
@@ -30,19 +30,19 @@ interface Queue {
   ActualPosition: number;
 }
 
-let restaurants: Restaurant[] = [ 
-  { 
-    Id: 1, 
-    Name: "Botequim Seu Jorge", 
+let restaurants: Restaurant[] = [
+  {
+    Id: 1,
+    Name: "Botequim Seu Jorge",
     logoUrl: "https://ofuxico.com.br/img/upload/noticias/2013/04/10/168360_36.jpg",
     imageUrl: "https://ofuxico.com.br/img/upload/noticias/2013/04/10/168360_36.jpg",
     description: "O melhor da comida de boteco tradicional, com um toque de sofisticação. Cerveja sempre gelada e petiscos de dar água na boca.",
     address: "Rua das Flores, 123 - Centro",
-    estimatedWaitTimePerPerson: 5, 
+    estimatedWaitTimePerPerson: 5,
   },
-  { 
-    Id: 2, 
-    Name: "Cantina da Nona", 
+  {
+    Id: 2,
+    Name: "Cantina da Nona",
     logoUrl: "https://s2-g1.glbimg.com/JtRD4x-KQ39FzvOYjb4RbtAhjcE=/0x0:3000x2050/984x0/smart/filters:strip_icc()/i.s3.glbimg.com/v1/AUTH_59edd422c0c84a879bd37670ae4f538a/internal_photos/bs/2020/Z/7/SMAe3pQ3CefBwb9jK5QQ/palmirinha-iwi-onodera-3.jpg",
     imageUrl: "https://s2-g1.glbimg.com/JtRD4x-KQ39FzvOYjb4RbtAhjcE=/0x0:3000x2050/984x0/smart/filters:strip_icc()/i.s3.glbimg.com/v1/AUTH_59edd422c0c84a879bd37670ae4f538a/internal_photos/bs/2020/Z/7/SMAe3pQ3CefBwb9jK5QQ/palmirinha-iwi-onodera-3.jpg",
     description: "Massas frescas feitas com amor, seguindo as receitas secretas da nona. O verdadeiro sabor da Itália no coração da cidade.",
@@ -56,7 +56,7 @@ let queue: Queue[] = [
 ];
 
 let userQueue: UserQueue[] = [
-  { QueueId: 1, UserId: 101, Position: 1},
+  { QueueId: 1, UserId: 101, Position: 1 },
   { QueueId: 1, UserId: 102, Position: 2 },
   { QueueId: 1, UserId: 103, Position: 3 },
 ];
@@ -93,6 +93,13 @@ export const joinQueue = (req: Request, res: Response): void => {
   const { UserId, IdRestaurant } = req.body;
   const userIdnumber = Number(UserId);
   const restaurantIdnumber = Number(IdRestaurant);
+
+  let targetRestaurant = restaurants.find(q => q.Id === restaurantIdnumber);
+
+  if (!targetRestaurant) {
+    res.status(404).json({ message: 'Restaurante não existe' });
+    return;
+  }
 
   if (userQueue.some(uq => uq.UserId === userIdnumber)) {
     res.status(403).json({ message: 'Usuário já está em uma fila' });
@@ -135,7 +142,7 @@ export const nextInQueue = (req: Request, res: Response): void => {
   const queueToAdvance = queue.find(q => q.IdRestaurant === Number(restaurantId));
 
   if (queueToAdvance && queueToAdvance.ActualPosition < queueToAdvance.ActualOccupation) {
-    queueToAdvance.ActualPosition += 1;    
+    queueToAdvance.ActualPosition += 1;
     getIO().emit('queue:update', { queues: queue, userQueues: userQueue });
     res.json({ message: `Restaurante ${restaurantId} chamou a posição ${queueToAdvance.ActualPosition}`, queue });
   } else {
@@ -159,21 +166,21 @@ export const leaveQueue = (req: Request, res: Response): void => {
   const queueId = userWhoLeft.QueueId;
   const positionOfUserWhoLeft = userWhoLeft.Position;
 
-  
+
   userQueue.splice(userIndex, 1);
 
-  
+
   const targetQueue = queue.find(q => q.Id === queueId);
   if (targetQueue) {
     targetQueue.ActualOccupation -= 1;
-    
+
     userQueue.forEach(user => {
       if (user.QueueId === queueId && user.Position > positionOfUserWhoLeft) {
         user.Position -= 1;
       }
     });
   }
-  
+
   getIO().emit('queue:update', { queues: queue, userQueues: userQueue });
 
   res.json({ message: `Usuário ${userIdnumber} removido da fila.`, queue });

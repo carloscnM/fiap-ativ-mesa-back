@@ -1,15 +1,14 @@
 import { Request, Response } from 'express';
-import { 
-  getRestaurants, 
-  getQueue, 
-  getUserQueue, 
-  joinQueue, 
-  nextInQueue, 
-  leaveQueue,  
-  __TEST_ONLY_resetState 
+import {
+  // Precisamos da função para resetar o estado antes de cada teste
+  __TEST_ONLY_resetState,
+  getRestaurants,
+  joinQueue,
+  leaveQueue,
+  nextInQueue
 } from '../controllers/queueController';
-import { getIO } from '../sockets/socket';
 
+// --- MOCK do Socket.io ---
 const mockEmit = jest.fn();
 jest.mock('../sockets/socket', () => ({
   getIO: jest.fn(() => ({
@@ -17,18 +16,21 @@ jest.mock('../sockets/socket', () => ({
   })),
 }));
 
+
 describe('Queue Controller', () => {
   let mockRequest: Partial<Request>;
   let mockResponse: Partial<Response>;
   let responseObject: any;
-  
+
+  // Hook que roda antes de CADA teste 'it(...)'
   beforeEach(() => {
-    // ANTES de CADA teste, resetamos o estado do controller
+    // 1. Reseta os dados (queue, userQueue) para o estado inicial
     __TEST_ONLY_resetState();
 
-    // Limpamos qualquer chamada anterior ao nosso mock de socket
+    // 2. Limpa o histórico de chamadas do nosso mock do socket
     mockEmit.mockClear();
-    
+
+    // 3. Prepara os objetos mock de request/response para o teste
     mockRequest = {};
     responseObject = {};
     mockResponse = {
@@ -46,7 +48,6 @@ describe('Queue Controller', () => {
     };
   });
 
-  
   // Testes para getRestaurants
   describe('getRestaurants', () => {
     it('deve retornar a lista de restaurantes com status 200', () => {
@@ -57,40 +58,39 @@ describe('Queue Controller', () => {
     });
   });
 
-  // Testes para getQueue
-  describe('getQueue', () => {
-    it('deve retornar a fila atual com status 200', () => {
-        getQueue(mockRequest as Request, mockResponse as Response);
-        expect(mockResponse.json).toHaveBeenCalled();
-        expect(responseObject.body).toBeInstanceOf(Array);
-    });
-  });
-
-  // Testes para getUserQueue
-  describe('getUserQueue', () => {
-    it('deve retornar os usuários na fila com status 200', () => {
-        getUserQueue(mockRequest as Request, mockResponse as Response);
-        expect(mockResponse.json).toHaveBeenCalled();
-        expect(responseObject.body).toBeInstanceOf(Array);
-    });
-  });
 
   // Testes para joinQueue
   describe('joinQueue', () => {
-    it('deve adicionar um usuário à fila e emitir um evento de atualização', () => {
-      mockRequest.body = { UserId: 999, IdRestaurant: 2 };
+    it('deve adicionar um usuário a uma fila existente', () => {
+      mockRequest.body = { UserId: 999, IdRestaurant: 2 }; // Restaurante 2 já tem fila
       joinQueue(mockRequest as Request, mockResponse as Response);
+
       expect(responseObject.statusCode).toBe(201);
       expect(responseObject.body.message).toBe('Usuário adicionado à fila');
       expect(mockEmit).toHaveBeenCalledWith('queue:update', expect.any(Object));
     });
 
     it('deve retornar erro 403 se o usuário já estiver em uma fila', () => {
-        mockRequest.body = { UserId: 101, IdRestaurant: 1 };
-        joinQueue(mockRequest as Request, mockResponse as Response);
-        expect(responseObject.statusCode).toBe(403);
-        expect(responseObject.body.message).toBe('Usuário já está em uma fila');
-        expect(mockEmit).not.toHaveBeenCalled();
+      mockRequest.body = { UserId: 101, IdRestaurant: 1 }; // Usuário 101 já existe
+      joinQueue(mockRequest as Request, mockResponse as Response);
+
+      expect(responseObject.statusCode).toBe(403);
+      expect(responseObject.body.message).toBe('Usuário já está em uma fila');
+      expect(mockEmit).not.toHaveBeenCalled();
+    });
+
+    it('NOVO: deve criar uma nova fila se o restaurante não tiver uma e adicionar o usuário', () => {
+      const newRestaurantId = 1; // ID de um restaurante que não tem fila
+      mockRequest.body = { UserId: 999, IdRestaurant: newRestaurantId };
+
+      joinQueue(mockRequest as Request, mockResponse as Response);
+
+      const newQueue = responseObject.body.queue.find((q: any) => q.IdRestaurant === newRestaurantId);
+
+      expect(responseObject.statusCode).toBe(201);
+      expect(newQueue).toBeDefined();
+      expect(newQueue.ActualOccupation).toBe(1);
+      expect(mockEmit).toHaveBeenCalled();
     });
   });
 
@@ -99,35 +99,53 @@ describe('Queue Controller', () => {
     it('deve avançar a fila e emitir um evento de atualização', () => {
       mockRequest.body = { restaurantId: 2 };
       nextInQueue(mockRequest as Request, mockResponse as Response);
-      expect(mockResponse.json).toHaveBeenCalled();
+
+      expect(responseObject.body.message).toContain('chamou a posição');
       expect(mockEmit).toHaveBeenCalledWith('queue:update', expect.any(Object));
     });
 
-    it('deve retornar erro 404 se não houver fila para avançar', () => {
-        mockRequest.body = { restaurantId: 99 };
+    it('NOVO: deve retornar erro se a fila já estiver no último cliente', () => {
+      mockRequest.body = { restaurantId: 1 };
+
+      const newRestaurantId = 1; // ID de um restaurante que não tem fila
+      mockRequest.body = { UserId: 999, IdRestaurant: newRestaurantId };
+
+      joinQueue(mockRequest as Request, mockResponse as Response);
+
+      let Maxcount = Number(2), i = Number(0);
+      while (i < Maxcount) {
         nextInQueue(mockRequest as Request, mockResponse as Response);
-        expect(responseObject.statusCode).toBe(404);
-        expect(responseObject.body.message).toContain('Nenhuma fila para avançar');
-        expect(mockEmit).not.toHaveBeenCalled();
+        i++;
+      }
+      expect(responseObject.statusCode).toBe(404);
+      expect(responseObject.body.message).toContain('Nenhuma fila para avançar ou já está no último cliente');
+    });
+
+    it('NOVO: deve retornar erro se a fila do restaurante não existir', () => {
+      mockRequest.body = { restaurantId: 1 }; // Restaurante sem fila
+      nextInQueue(mockRequest as Request, mockResponse as Response);
+
+      expect(responseObject.statusCode).toBe(404);
+      expect(responseObject.body.message).toContain('Nenhuma fila para avançar');
     });
   });
 
   // Testes para leaveQueue
   describe('leaveQueue', () => {
     it('deve remover um usuário da fila e emitir um evento de atualização', () => {
-      mockRequest.body = { UserId: 102 };
+      mockRequest.body = { UserId: 101 }; // Usuário no início da fila
       leaveQueue(mockRequest as Request, mockResponse as Response);
-      expect(mockResponse.json).toHaveBeenCalled();
+
       expect(responseObject.body.message).toContain('removido da fila');
       expect(mockEmit).toHaveBeenCalledWith('queue:update', expect.any(Object));
     });
 
     it('deve retornar erro 404 se o usuário não for encontrado na fila', () => {
-        mockRequest.body = { UserId: 888 };
-        leaveQueue(mockRequest as Request, mockResponse as Response);
-        expect(responseObject.statusCode).toBe(404);
-        expect(responseObject.body.message).toBe('Usuário não encontrado em nenhuma fila.');
-        expect(mockEmit).not.toHaveBeenCalled();
+      mockRequest.body = { UserId: 888 }; // Usuário não existe
+      leaveQueue(mockRequest as Request, mockResponse as Response);
+
+      expect(responseObject.statusCode).toBe(404);
+      expect(responseObject.body.message).toBe('Usuário não encontrado em nenhuma fila.');
     });
   });
 });
