@@ -3,7 +3,6 @@ import { getQueue, joinQueue, nextInQueue, getRestaurants, leaveQueue, getUserQu
 
 const router: Router = Router();
 
-// Apenas as rotas, sem nenhum comentário de documentação
 router.get('/restaurants', getRestaurants);
 router.get('/queue', getQueue);
 router.get('/userQueue', getUserQueue);

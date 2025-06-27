@@ -30,6 +30,7 @@ interface Queue {
   ActualPosition: number;
 }
 
+// --- MOCKS SIMULANDO O BD---
 let restaurants: Restaurant[] = [
   {
     Id: 1,
@@ -138,7 +139,7 @@ export const joinQueue = (req: Request, res: Response): void => {
  * Esta ação é geralmente feita por um administrador/funcionário do restaurante.
  */
 export const nextInQueue = (req: Request, res: Response): void => {
-  const { restaurantId } = req.body; // O ideal é saber qual fila avançar
+  const { restaurantId } = req.body; 
   const queueToAdvance = queue.find(q => q.IdRestaurant === Number(restaurantId));
 
   if (queueToAdvance && queueToAdvance.ActualPosition < queueToAdvance.ActualOccupation) {
@@ -156,7 +157,6 @@ export const leaveQueue = (req: Request, res: Response): void => {
 
   const userIndex = userQueue.findIndex(u => u.UserId === userIdnumber);
 
-  // Verifica se o usuário realmente está em uma fila
   if (userIndex === -1) {
     res.status(404).json({ message: 'Usuário não encontrado em nenhuma fila.' });
     return;

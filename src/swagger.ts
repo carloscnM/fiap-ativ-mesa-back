@@ -1,5 +1,3 @@
-// Este arquivo agora exporta um objeto de especificação OpenAPI, sem usar swagger-jsdoc
-
 const swaggerSpec = {
   openapi: '3.0.0',
   info: {

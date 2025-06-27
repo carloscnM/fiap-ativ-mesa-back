@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
-import {
-  // Precisamos da função para resetar o estado antes de cada teste
+import {  
   __TEST_ONLY_resetState,
   getRestaurants,
   joinQueue,
@@ -21,16 +20,15 @@ describe('Queue Controller', () => {
   let mockRequest: Partial<Request>;
   let mockResponse: Partial<Response>;
   let responseObject: any;
-
-  // Hook que roda antes de CADA teste 'it(...)'
+  
   beforeEach(() => {
-    // 1. Reseta os dados (queue, userQueue) para o estado inicial
+    // 1. Reseta os dados (queue, userQueue)
     __TEST_ONLY_resetState();
 
-    // 2. Limpa o histórico de chamadas do nosso mock do socket
+    // 2. Limpa o histórico de chamadas do mock do socket
     mockEmit.mockClear();
 
-    // 3. Prepara os objetos mock de request/response para o teste
+    // 3. Prepara os objetos mock de request/response
     mockRequest = {};
     responseObject = {};
     mockResponse = {
@@ -79,7 +77,7 @@ describe('Queue Controller', () => {
       expect(mockEmit).not.toHaveBeenCalled();
     });
 
-    it('NOVO: deve criar uma nova fila se o restaurante não tiver uma e adicionar o usuário', () => {
+    it('deve criar uma nova fila se o restaurante não tiver uma e adicionar o usuário', () => {
       const newRestaurantId = 1; // ID de um restaurante que não tem fila
       mockRequest.body = { UserId: 999, IdRestaurant: newRestaurantId };
 
@@ -104,7 +102,7 @@ describe('Queue Controller', () => {
       expect(mockEmit).toHaveBeenCalledWith('queue:update', expect.any(Object));
     });
 
-    it('NOVO: deve retornar erro se a fila já estiver no último cliente', () => {
+    it('deve retornar erro se a fila já estiver no último cliente', () => {
       mockRequest.body = { restaurantId: 1 };
 
       const newRestaurantId = 1; // ID de um restaurante que não tem fila
@@ -121,7 +119,7 @@ describe('Queue Controller', () => {
       expect(responseObject.body.message).toContain('Nenhuma fila para avançar ou já está no último cliente');
     });
 
-    it('NOVO: deve retornar erro se a fila do restaurante não existir', () => {
+    it('deve retornar erro se a fila do restaurante não existir', () => {
       mockRequest.body = { restaurantId: 1 }; // Restaurante sem fila
       nextInQueue(mockRequest as Request, mockResponse as Response);
 
